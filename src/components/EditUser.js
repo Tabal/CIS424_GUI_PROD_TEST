@@ -84,7 +84,6 @@ const EditUser = (user) => {
     checkboxes.forEach((checkbox) => {
       // Check if the checkbox is checked
       if (checkbox.checked) {
-        //console.log(`Checkbox with value ${checkbox.value} is selected.`);
         temp += checkbox.value + ","
 
       }
@@ -127,7 +126,7 @@ const EditUser = (user) => {
     event.preventDefault(); //prevent default refresh until requests have been made
 
     //this pos is currently enabled. lets disable it
-    if (user.user.enabled == true) {
+    if (user.user.enabled === true) {
       if (user.user.position === "Owner" && numActiveOwners <= 1) {
         setResult("Cannot deactivate the only active owner.");
       }
@@ -145,41 +144,42 @@ const EditUser = (user) => {
           }
         )
           .then((response) => {
-            if (response.data.response == "Disabled") {
+            if (response.data.response === "Disabled") {
               toast.success("User deactivated");
               window.location.reload(); // This will refresh the page
             }
             else {
-              //console.error("Failed to disable user");
+              toast.error("Failed to disable user");
             }
           })
           .catch((error) => {
-            console.error("API request failed:", error);
             toast.error("Request Failed. Try again.")
           });
       }
     }
     //this user is disables, re-enable
-    if (user.user.enabled == false) {
-      //this post request sends the userID to be disabled in the DB
-      axios
-        .post("https://cis424-rest-api.azurewebsites.net/SVSU_CIS424/EnableUser",
-          {
-            "ID": user.user.ID,
-          })
+    if (user.user.enabled === false) {
+      //this post request sends the userID to be enabled in the DB
+      axios.post(
+        process.env.REACT_APP_REQUEST_URL + 'EnableUser',
+        {
+          "ID": user.user.ID,
+        },
+        {
+          headers: {
+            [process.env.REACT_APP_HEADER]: process.env.REACT_APP_API_KEY
+          }
+        }
+      )
         .then((response) => {
 
-          console.log(response.data.response);
-
-          if (response.data.response == "Enabled") {
+          if (response.data.response === "Enabled") {
             toast.success("User Activated");
             window.location.reload(); // This will refresh the page
           } else {
-            console.error("Failed to enable user");
           }
         })
         .catch((error) => {
-          console.error("API request failed:", error);
           toast.error("Request Failed. Try again.")
         });
     }
@@ -191,19 +191,20 @@ const EditUser = (user) => {
     event.preventDefault();
 
     //create an axios POST request to create a new user with inputs from the form
-    axios
-      .post("https://cis424-rest-api.azurewebsites.net/SVSU_CIS424/EditUser",
-        {
-          "ID": user.user.ID,
-          "username": username,
-          "name": lastname + ", " + firstname,
-          "storeCSV": getCSV(),
-          "position": position
-        })
-
-
-
-      .then((response) => {
+    axios.post(process.env.REACT_APP_REQUEST_URL+`EditUser`,
+      {
+        "ID": user.user.ID,
+        "username": username,
+        "name": lastname + ", " + firstname,
+        "storeCSV": getCSV(),
+        "position": position
+      },
+      {
+        headers: {
+          [process.env.REACT_APP_HEADER]: process.env.REACT_APP_API_KEY
+        }
+      }
+    )      .then((response) => {
 
         //if the response data was not an API error
         //the following line indicates a successful entry
@@ -223,7 +224,6 @@ const EditUser = (user) => {
       })
       //error if the API request failed
       .catch((error) => {
-        console.error("API request failed:", error);
         toast.error("Request Failed. Try again.")
       });
   };
@@ -309,7 +309,7 @@ const EditUser = (user) => {
                       />
                       <label htmlFor="Team Leader" className="mr-4">Team Leader</label>
                     </div>
-                    {auth.cookie.user.position == "Owner" && (
+                    {auth.cookie.user.position === "Owner" && (
                       <div>
                         <div className="flex items-center">
                           <input
