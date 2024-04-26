@@ -14,6 +14,7 @@ import "primereact/resources/primereact.min.css";
 import "primereact/resources/themes/mira/theme.css";
 import "primeicons/primeicons.css";
 import jsPDF from "jspdf";
+import { clamp } from "../clamp.js";
 
 // USD Icon imports
 import BillHundred from "../usd_icons/bills/BillHundred.svg";
@@ -187,16 +188,24 @@ const FundsTransferPage = () => {
         .classList.remove("select-input-error");
     } else {
       // For numeric fields, parse the value to a number, defaulting to 0 for non-numeric or negative inputs
-      let parsedValue = parseFloat(value);
+      /*let parsedValue = parseFloat(value);
       if (isNaN(parsedValue) || parsedValue < 0) {
         parsedValue = 0;
         event.target.value = "0"; // Update the input field value to "0"
-      }
+      }*/
+      
+      // Removes leading zeros from the input
+      event.target.value = event.target.value.replace(/^0+/, "");
+
+      // Parse the value to a float or default to 0 if not a valid number
+      const parsedValue = parseFloat(value) || 0;
+
       // Update the form data for numeric inputs
       setFormData((prevFormData) => ({
         ...prevFormData,
         [name]: parsedValue,
       }));
+
       // Calculate the amount based on the denomination fields
       CalculateAmount({
         ...formData,
@@ -747,6 +756,9 @@ const FundsTransferPage = () => {
                   <th></th>
                   <th>Loose Coins</th>
                   <th></th>
+                  {showExtraChange && (
+                    <th>Extras</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -756,7 +768,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="hundred_input">
                       <img
                         src={BillHundred}
-                        alt="100's"
+                        //alt="100's"
                         className="inline-block align-middle w-12 h-12"
                         alt="Hundred Dollar Bill"
                       />
@@ -767,6 +779,7 @@ const FundsTransferPage = () => {
                       id="hundred_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.hundred}
                       onChange={HandleChange}
@@ -789,7 +802,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="quarterRoll_input">
                       <img
                         src={RollQuarter}
-                        alt="Quarter Rolls"
+                        //alt="Quarter Rolls"
                         className="inline-block align-middle w-12 h-12"
                         alt="Quarter Roll"
                       />
@@ -800,6 +813,7 @@ const FundsTransferPage = () => {
                       id="quarterRoll_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.quarterRoll}
                       onChange={HandleChange}
@@ -822,7 +836,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="quarter_input">
                       <img
                         src={CoinQuarter}
-                        alt="Quarters"
+                        //alt="Quarters"
                         className="inline-block align-middle w-12 h-12"
                         alt="Quarter Coin"
                       />
@@ -833,6 +847,7 @@ const FundsTransferPage = () => {
                       id="quarter_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.quarter}
                       onChange={HandleChange}
@@ -850,6 +865,31 @@ const FundsTransferPage = () => {
                       value={(formData.quarter * 0.25).toFixed(2)}
                     />
                   </td>
+                  {/* Extras Column */}
+                  {showExtraChange && (
+                    <td className="flex items-center">
+                      <label htmlFor="two_input">
+                        <img
+                          src={BillTwo}
+                          //alt="2's"
+                          className="inline-block align-middle w-12 h-12"
+                          alt="Two Dollar Bill"
+                        />
+                      </label>
+                      <input
+                        type="number"
+                        name="two"
+                        id="two_input"
+                        step={1}
+                        min={0}
+                        max={100000}
+                        className="denomination-input"
+                        value={formData.two}
+                        onChange={HandleChange}
+                        tabIndex={17}
+                      />
+                    </td>
+                  )}
                 </tr>
                 <tr>
                   {/* Bills Column */}
@@ -857,7 +897,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="fifty_input">
                       <img
                         src={BillFifty}
-                        alt="50's"
+                        //alt="50's"
                         className="inline-block align-middle w-12 h-12"
                         alt="Fifty Dollar Bill"
                       />
@@ -868,6 +908,7 @@ const FundsTransferPage = () => {
                       id="fifty_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.fifty}
                       onChange={HandleChange}
@@ -890,7 +931,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="dimeRoll_input">
                       <img
                         src={RollDime}
-                        alt="Dime Rolls"
+                        //alt="Dime Rolls"
                         className="inline-block align-middle w-12 h-12"
                         alt="Dime Roll"
                       />
@@ -901,6 +942,7 @@ const FundsTransferPage = () => {
                       id="dimeRoll_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.dimeRoll}
                       onChange={HandleChange}
@@ -923,7 +965,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="dime_input">
                       <img
                         src={CoinDime}
-                        alt="Dimes"
+                        //alt="Dimes"
                         className="inline-block align-middle w-12 h-12"
                         alt="Dime Coin"
                       />
@@ -934,6 +976,7 @@ const FundsTransferPage = () => {
                       id="dime_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.dime}
                       onChange={HandleChange}
@@ -951,6 +994,31 @@ const FundsTransferPage = () => {
                       value={(formData.dime * 0.1).toFixed(2)}
                     />
                   </td>
+                  {/* Extras Column */}
+                  {showExtraChange && (
+                    <td className="flex items-center">
+                      <label htmlFor="one_input">
+                        <img
+                          src={BillOne}
+                          //alt="1's"
+                          className="inline-block align-middle w-12 h-12"
+                          alt="One Dollar Bill"
+                        />
+                      </label>
+                      <input
+                        type="number"
+                        name="one"
+                        id="one_input"
+                        step={1}
+                        min={0}
+                        max={100000}
+                        className="denomination-input"
+                        value={formData.one}
+                        onChange={HandleChange}
+                        tabIndex={18}
+                      />
+                    </td>
+                  )}
                 </tr>
                 <tr>
                   {/* Bills Column */}
@@ -958,7 +1026,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="twenty_input">
                       <img
                         src={BillTwenty}
-                        alt="20's"
+                        //alt="20's"
                         className="inline-block align-middle w-12 h-12"
                         alt="Twenty Dollar Bill"
                       />
@@ -969,6 +1037,7 @@ const FundsTransferPage = () => {
                       id="twenty_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.twenty}
                       onChange={HandleChange}
@@ -991,7 +1060,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="nickelRoll_input">
                       <img
                         src={RollNickel}
-                        alt="Nickel Rolls"
+                        //alt="Nickel Rolls"
                         className="inline-block align-middle w-12 h-12"
                         alt="Nickel Roll"
                       />
@@ -1002,6 +1071,7 @@ const FundsTransferPage = () => {
                       id="nickelRoll_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.nickelRoll}
                       onChange={HandleChange}
@@ -1024,7 +1094,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="nickel_input">
                       <img
                         src={CoinNickel}
-                        alt="Nickels"
+                        //alt="Nickels"
                         className="inline-block align-middle w-12 h-12"
                         alt="Nickel Coin"
                       />
@@ -1035,6 +1105,7 @@ const FundsTransferPage = () => {
                       id="nickel_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.nickel}
                       onChange={HandleChange}
@@ -1052,6 +1123,31 @@ const FundsTransferPage = () => {
                       value={(formData.nickel * 0.05).toFixed(2)}
                     />
                   </td>
+                  {/* Extras Column */}
+                  {showExtraChange && (
+                    <td className="flex items-center">
+                      <label htmlFor="halfDollar_input">
+                        <img
+                          src={CoinHalf}
+                          //alt="Half Dollars"
+                          className="inline-block align-middle w-12 h-12"
+                          alt="Half Dollar Coin"
+                        />
+                      </label>
+                      <input
+                        type="number"
+                        name="halfDollar"
+                        id="halfDollar_input"
+                        step={1}
+                        min={0}
+                        max={100000}
+                        className="denomination-input"
+                        value={formData.halfDollar}
+                        onChange={HandleChange}
+                        tabIndex={19}
+                      />
+                    </td>
+                  )}
                 </tr>
                 <tr>
                   {/* Bills Column */}
@@ -1059,7 +1155,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="ten_input">
                       <img
                         src={BillTen}
-                        alt="10's"
+                        //alt="10's"
                         className="inline-block align-middle w-12 h-12"
                         alt="Ten Dollar Bill"
                       />
@@ -1070,6 +1166,7 @@ const FundsTransferPage = () => {
                       id="ten_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.ten}
                       onChange={HandleChange}
@@ -1092,7 +1189,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="pennyRoll_input">
                       <img
                         src={RollPenny}
-                        alt="Penny Rolls"
+                        //alt="Penny Rolls"
                         className="inline-block align-middle w-12 h-12"
                         alt="Penny Roll"
                       />
@@ -1103,6 +1200,7 @@ const FundsTransferPage = () => {
                       id="pennyRoll_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.pennyRoll}
                       onChange={HandleChange}
@@ -1125,7 +1223,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="penny_input">
                       <img
                         src={CoinPenny}
-                        alt="Pennies"
+                        //alt="Pennies"
                         className="inline-block align-middle w-12 h-12"
                         alt="Penny Coin"
                       />
@@ -1136,6 +1234,7 @@ const FundsTransferPage = () => {
                       id="penny_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.penny}
                       onChange={HandleChange}
@@ -1160,7 +1259,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="five_input">
                       <img
                         src={BillFive}
-                        alt="5's"
+                        //alt="5's"
                         className="inline-block align-middle w-12 h-12"
                         alt="Five Dollar Bill"
                       />
@@ -1171,6 +1270,7 @@ const FundsTransferPage = () => {
                       id="five_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.five}
                       onChange={HandleChange}
@@ -1188,75 +1288,6 @@ const FundsTransferPage = () => {
                       value={(formData.five * 5).toFixed(2)}
                     />
                   </td>
-                  {/* Extras Column */}
-                  {showExtraChange === true && (
-                    <>
-                      <td className="flex items-center">
-                        <label htmlFor="oneCoin_input">
-                          <img
-                            src={CoinOne}
-                            alt="Dollar Coins"
-                            className="inline-block align-middle w-12 h-12"
-                            alt="One Dollar Coin"
-                          />
-                        </label>
-                        <input
-                          type="number"
-                          name="dollarCoin"
-                          id="oneCoin_input"
-                          step={1}
-                          min={0}
-                          className="denomination-input"
-                          value={formData.dollarCoin}
-                          onChange={HandleChange}
-                          tabIndex={12}
-                        />
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          prefix="$"
-                          decimalSeparator="."
-                          groupSeparator=","
-                          placeholder="0.00"
-                          readOnly={true}
-                          className="denomination"
-                          value={(formData.dollarCoin * 1).toFixed(2)}
-                        />
-                      </td>
-                      <td className="flex items-center">
-                        <label htmlFor="">
-                          <img
-                            src={BillTwo}
-                            alt="2's"
-                            className="inline-block align-middle w-12 h-12"
-                            alt="Two Dollar Bill"
-                          />
-                        </label>
-                        <input
-                          type="number"
-                          name="two"
-                          id="two_input"
-                          step={1}
-                          min={0}
-                          className="denomination-input"
-                          value={formData.two}
-                          onChange={HandleChange}
-                          tabIndex={17}
-                        />
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          prefix="$"
-                          decimalSeparator="."
-                          groupSeparator=","
-                          placeholder="0.00"
-                          readOnly={true}
-                          className="denomination"
-                          value={(formData.two * 2).toFixed(2)}
-                        />
-                      </td>
-                    </>
-                  )}
                 </tr>
                 <tr>
                   {/* Bills Column */}
@@ -1264,7 +1295,7 @@ const FundsTransferPage = () => {
                     <label htmlFor="one_input">
                       <img
                         src={BillOne}
-                        alt="1's"
+                        //alt="1's"
                         className="inline-block align-middle w-12 h-12"
                         alt="One Dollar Bill"
                       />
@@ -1275,6 +1306,7 @@ const FundsTransferPage = () => {
                       id="one_input"
                       step={1}
                       min={0}
+                      max={100000}
                       className="denomination-input"
                       value={formData.one}
                       onChange={HandleChange}
@@ -1292,43 +1324,6 @@ const FundsTransferPage = () => {
                       value={(formData.one * 1).toFixed(2)}
                     />
                   </td>
-                  {/* Extras Column */}
-                  {showExtraChange === true && (
-                    <>
-                      <td className="flex items-center">
-                        <label htmlFor="halfDollar_input">
-                          <img
-                            src={CoinHalf}
-                            alt="Half Dollar Coins"
-                            className="inline-block align-middle w-12 h-12"
-                            alt="Half Dollar Coin"
-                          />
-                        </label>
-                        <input
-                          type="number"
-                          name="halfDollar"
-                          id="halfDollar_input"
-                          step={1}
-                          min={0}
-                          className="denomination-input"
-                          value={formData.halfDollar}
-                          onChange={HandleChange}
-                          tabIndex={12}
-                        />
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          prefix="$"
-                          decimalSeparator="."
-                          groupSeparator=","
-                          placeholder="0.00"
-                          readOnly={true}
-                          className="denomination"
-                          value={(formData.halfDollar * 0.5).toFixed(2)}
-                        />
-                      </td>
-                    </>
-                  )}
                 </tr>
               </tbody>
             </table>

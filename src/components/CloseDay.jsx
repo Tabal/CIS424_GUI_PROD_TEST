@@ -13,6 +13,7 @@ import { Button } from "primereact/button";
 import "primereact/resources/primereact.min.css";
 import "primereact/resources/themes/mira/theme.css";
 import "primeicons/primeicons.css";
+import { clamp } from "../clamp.js";
 
 // USD Icon imports
 import BillHundred from "../usd_icons/bills/BillHundred.svg";
@@ -162,22 +163,6 @@ const CloseDayPage = () => {
     ) {
       return 0;
     }
-  }
-
-  //keep values clamped between a minimum and maxium value
-  function clamp(value, min = 0, max = 100000) {
-    //first check if value is a number
-    if (isNaN(Number(value))) {
-      return min;
-    }
-
-    //if all is ok, do regular clamping
-    if (Number(value) < min) {
-      return min;
-    } else if (Number(value) > max) {
-      return max;
-    }
-    return Number(value);
   }
 
   //call on component load AND when the currently-selected pos has refreshed
@@ -424,6 +409,84 @@ const CloseDayPage = () => {
 
     // Round the total value to the nearest cent
     totalTransferAmount = Math.round(totalTransferAmount * 100) / 100;
+      
+    
+    // Make sure to only round if the safe is being closed
+    // And we only need to round if the total isn't a multiple of $20
+    if (currentPosIndex === 0 && totalTransferAmount % 20 != 0) {
+
+      let roundValue = 0;
+      let totalAtNearest20 = totalTransferAmount;
+
+      // Denominations needed to get rounded up to the nearest $20
+      let roundTens = 0;
+      let roundFives = 0;
+      let roundOnes = 0;
+      let roundPennyRolls = 0;
+
+      // Round value will be what we break down for denominations + penny rolls
+      // TotalAtNearest20 will be the total once we round up
+      while (totalAtNearest20 % 20 != 0) {
+        roundValue += Number(0.5);
+        totalAtNearest20 += Number(0.5);
+      }
+
+      // Check if we need to round up or down
+      // Round down if we need more than $10 to round up
+      if (roundValue <= 10) {
+
+        //Get the number of 10's needed to round to the nearest $20
+        roundTens = Math.floor(roundValue / 10);
+        info.ten += roundTens;
+        roundValue -= (10 * roundTens);
+
+        // Check for the number of 5's needed
+        roundFives = Math.floor(roundValue / 5);
+        info.five += roundFives;
+        roundValue -= (5 * roundFives);
+    
+        // Check if we need a penny roll or not
+        if (roundValue % 1 != 0) { // $2.50
+          roundPennyRolls += 1; // 1
+          info.pennyRoll += roundPennyRolls; // However many rolls we have + 1
+          roundValue -= (roundPennyRolls * 0.5); // $2.50 - 0.5 = $2
+        }
+    
+        // Get any last ones
+        roundOnes = roundValue;
+        info.one += roundOnes;
+        roundValue -= roundOnes;
+
+      } else if (roundValue > 10) { // Round down when the roundValue is 10
+
+        // Roundvalue would be over 10 because we assumed we were rounding up
+        // To get the value we need to round down, subtract the roundValue from 20.
+        // If we round 16 to get from $24 to $40, roundValue would be $16.
+        // So to round down to the nearest $20, which is $20, 20-16 would give us $4 to round down.
+        roundValue = 20 - roundValue;
+        totalAtNearest20 -= Number(20);
+
+        // Check for the number of 5's needed
+        roundFives = Math.floor(roundValue / 5);
+        info.five -= roundFives;
+        roundValue -= (5 * roundFives);
+    
+        // Check if we need a penny roll or not
+        if (roundValue % 1 != 0) { // $2.50
+          roundPennyRolls += 1; // 1
+          info.pennyRoll -= roundPennyRolls; // However many rolls we have + 1
+          roundValue -= (roundPennyRolls * 0.5); // $2.50 - 0.5 = $2
+        }
+    
+        // Get any last ones
+        roundOnes = roundValue;
+        info.one -= roundOnes;
+        roundValue -= roundOnes;
+      }
+      
+      totalTransferAmount = totalAtNearest20;
+    }
+  
 
     if (poss[currentPosIndex].opened) {
       if (currentPosIndex === 0) {
@@ -436,7 +499,7 @@ const CloseDayPage = () => {
               total: totalAmount,
               type: "CLOSE",
               itemCounted: poss[currentPosIndex].name,
-              amountExpected: expectedAmount,
+              amountExpected: Number(expectedAmount),
               hundred: elm100Dollar,
               fifty: elm50Dollar,
               twenty: elm20Dollar,
@@ -520,7 +583,7 @@ const CloseDayPage = () => {
               total: totalAmount,
               type: "CLOSE",
               itemCounted: poss[currentPosIndex].name,
-              amountExpected: expectedAmount,
+              amountExpected: Number(expectedAmount),
               hundred: elm100Dollar,
               fifty: elm50Dollar,
               twenty: elm20Dollar,
@@ -538,8 +601,8 @@ const CloseDayPage = () => {
               dimeRoll: elmDimesRolled,
               nickelRoll: elmNicklesRolled,
               pennyRoll: elmPenniesRolled,
-              creditExpected: creditExpected,
-              creditActual: creditActual,
+              creditExpected: Number(creditExpected),
+              creditActual: Number(creditActual),
               cashToSafeTotal: totalTransferAmount,
               hundredToSafe: info.hundred,
               fiftyToSafe: info.fifty,
@@ -685,7 +748,7 @@ const CloseDayPage = () => {
         </div>
         <div className="text-main-color float-left ml-16 mt-4">
           {posHasLoaded ? (
-            <div className="flex flex-row justify-center">
+            <div className="flex flex-row justify-left ml-32">
               <div>
                 <label className="text-xl">
                   {" "}
@@ -723,7 +786,7 @@ const CloseDayPage = () => {
           )}
 
           {posHasLoaded && currentPosIndex !== 0 && (
-            <div className="flex flex-row justify-center">
+            <div className="flex flex-row justify-left ml-32">
               <div className="flex flex-row">
                 <div>
                   <label className="text-xl">
@@ -779,13 +842,26 @@ const CloseDayPage = () => {
                   <td className="text-2xl">Coins</td>
                   <td className="text-2xl pl-6">Expected</td>
                   <td className="text-2xl pl-6">Actual</td>
+                  {showExtraChange === true ? (
+                    <>
+                      <td className="text-2xl">Other</td>
+                      <td className="text-2xl pl-6">Expected</td>
+                      <td className="text-2xl pl-6">Actual</td>
+                    </>
+                  ) : (
+                    <>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                    </>
+                  )}
                 </tr>
                 <tr>
                   <td>
                     <label>
                       <img
                         src={BillHundred}
-                        alt="100's"
+                        //alt="100's"
                         className="inline-block align-middle w-12 h-12"
                         alt="100 Dollar Bill"
                       />
@@ -797,26 +873,31 @@ const CloseDayPage = () => {
                       //onChange={e => setElm100DollarExpected(clamp(e.target.value))}
                       min="0"
                       className="box-border rounded-md text-center ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
+                      type="text"
                       disabled={true}
                     />
                   </td>
                   <td>
                     <input
                       value={elm100Dollar}
-                      onChange={(e) => setElm100Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm100Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                       type="number"
+                      tabIndex={1}
                     />
                   </td>
                   <td>
                     <label>
                       <img
                         src={RollQuarter}
-                        alt="Quarter Rolls"
+                        //alt="Quarter Rolls"
                         className="inline-block align-middle w-12 h-12"
-                        alt="Roll of Quarters"
+                        alt="Quarter Roll"
                       />
                     </label>
                   </td>
@@ -825,379 +906,32 @@ const CloseDayPage = () => {
                       value={elmQuartersRolledExpected}
                       //onChange={e => setElmQuartersRolledExpected(clamp(e.target.value))}
                       min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
                       disabled={true}
                     />
                   </td>
                   <td>
                     <input
                       value={elmQuartersRolled}
-                      onChange={(e) =>
-                        setElmQuartersRolled(clamp(e.target.value))
-                      }
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmQuartersRolled(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                       type="number"
+                      tabIndex={7}
                     />
                   </td>
-                </tr>
-                <tr>
-                  <td>
-                    <label>
-                      <img
-                        src={BillFifty}
-                        alt="50's"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="50 Dollar Bill"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elm50DollarExpected}
-                      //onChange={e => setElm50DollarExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elm50Dollar}
-                      onChange={(e) => setElm50Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                  <td>
-                    <label>
-                      <img
-                        src={RollDime}
-                        alt="Dime Rolls"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Roll of Dimes"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmDimesRolledExpected}
-                      //onChange={e => setElmDimesRolledExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmDimesRolled}
-                      onChange={(e) => setElmDimesRolled(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <label>
-                      <img
-                        src={BillTwenty}
-                        alt="20's"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="20 Dollar Bill"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elm20DollarExpected}
-                      //onChange={e => setElm20DollarExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elm20Dollar}
-                      onChange={(e) => setElm20Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                  <td>
-                    <label>
-                      <img
-                        src={RollNickel}
-                        alt="Nickel Rolls"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Roll of Nickels"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmNicklesRolledExpected}
-                      //onChange={e => setElmNicklesRolledExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmNicklesRolled}
-                      onChange={(e) =>
-                        setElmNicklesRolled(clamp(e.target.value))
-                      }
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <label>
-                      <img
-                        src={BillTen}
-                        alt="10's"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="10 Dollar Bill"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elm10DollarExpected}
-                      //onChange={e => setElm10DollarExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elm10Dollar}
-                      onChange={(e) => setElm10Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                  <td>
-                    <label>
-                      <img
-                        src={RollPenny}
-                        alt="Penny Rolls"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Roll of Pennies"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmPenniesRolledExpected}
-                      //onChange={e => setElmPenniesRolledExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmPenniesRolled}
-                      onChange={(e) =>
-                        setElmPenniesRolled(clamp(e.target.value))
-                      }
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <label>
-                      <img
-                        src={BillFive}
-                        alt="5's"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="5 Dollar Bill"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elm5DollarExpected}
-                      //onChange={e => setElm5DollarExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elm5Dollar}
-                      onChange={(e) => setElm5Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                  <td>
-                    <label>
-                      <img
-                        src={CoinQuarter}
-                        alt="Quarters"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Quarter Coin"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmQuartersExpected}
-                      //onChange={e => setElmQuartersExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmQuarters}
-                      onChange={(e) => setElmQuarters(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <label>
-                      <img
-                        src={BillOne}
-                        alt="1's"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="1 Dollar Bill"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elm1DollarExpected}
-                      //onChange={e => setElm1DollarExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elm1Dollar}
-                      onChange={(e) => setElm1Dollar(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                  <td>
-                    <label>
-                      <img
-                        src={CoinDime}
-                        alt="Dimes"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Dime Coin"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmDimesExpected}
-                      //onChange={e => setElmDimesExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmDimes}
-                      onChange={(e) => setElmDimes(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  {showExtraChange === true ? (
-                    <>
-                      <td className="text-2xl">Other</td>
-                      <td></td>
-                      <td></td>
-                    </>
-                  ) : (
-                    <>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                    </>
-                  )}
-                  <td>
-                    <label>
-                      <img
-                        src={CoinNickel}
-                        alt="Nickels"
-                        className="inline-block align-middle w-12 h-12"
-                        alt="Nickel Coin"
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <input
-                      value={elmNicklesExpected}
-                      //onChange={e => setElmNicklesExpected(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
-                      disabled={true}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={elmNickles}
-                      onChange={(e) => setElmNickles(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  {showExtraChange === true ? (
+                  {showExtraChange === true && (
                     <>
                       <td>
                         <label>
                           <img
                             src={CoinOne}
-                            alt="Dollar Coins"
+                            //alt="Dollar Coins"
                             className="inline-block align-middle w-12 h-12"
                             alt="1 Dollar Coin"
                           />
@@ -1208,67 +942,104 @@ const CloseDayPage = () => {
                           value={elm1DollarCoinExpected}
                           //onChange={e => setElm1DollarCoinExpected(clamp(e.target.value))}
                           min="0"
-                          className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                          type="number"
+                          className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                          type="text"
                           disabled={true}
                         />
                       </td>
                       <td>
                         <input
                           value={elm1DollarCoin}
-                          onChange={(e) =>
-                            setElm1DollarCoin(clamp(e.target.value))
-                          }
-                          min="0"
-                          className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                          onChange={(e) => {
+                            const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                            setElm1DollarCoin(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                          }}
+                          min={0}
+                          max={100000}
+                          className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                           type="number"
+                          tabIndex={15}
                         />
                       </td>
                     </>
-                  ) : (
-                    <>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                    </>
                   )}
+                </tr>
+                <tr>
                   <td>
                     <label>
                       <img
-                        src={CoinPenny}
-                        alt="Pennies"
+                        src={BillFifty}
+                        //alt="50's"
                         className="inline-block align-middle w-12 h-12"
-                        alt="Penny Coin"
+                        alt="50 Dollar Bill"
                       />
                     </label>
                   </td>
                   <td>
                     <input
-                      value={elmPenniesExpected}
-                      //onChange={e => setElmPenniesExpected(clamp(e.target.value))}
+                      value={elm50DollarExpected}
+                      //onChange={e => setElm50DollarExpected(clamp(e.target.value))}
                       min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                      type="number"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
                       disabled={true}
                     />
                   </td>
                   <td>
                     <input
-                      value={elmPennies}
-                      onChange={(e) => setElmPennies(clamp(e.target.value))}
-                      min="0"
-                      className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      value={elm50Dollar}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm50Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                       type="number"
+                      tabIndex={2}
                     />
                   </td>
-                </tr>
-                {showExtraChange === true && (
-                  <tr>
+                  <td>
+                    <label>
+                      <img
+                        src={RollDime}
+                        //alt="Dime Rolls"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Dime Roll"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmDimesRolledExpected}
+                      //onChange={e => setElmDimesRolledExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmDimesRolled}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmDimesRolled(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={8}
+                    />
+                  </td>
+                  {showExtraChange === true && (
+                  <>
                     <td>
                       <label>
                         <img
                           src={BillTwo}
-                          alt="2's"
+                          //alt="2's"
                           className="inline-block align-middle w-12 h-12"
                           alt="2 Dollar Bill"
                         />
@@ -1279,29 +1050,104 @@ const CloseDayPage = () => {
                         value={elm2DollarExpected}
                         //onChange={e => setElm2DollarExpected(clamp(e.target.value))}
                         min="0"
-                        className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                        type="number"
+                        className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                        type="text"
                         disabled={true}
                       />
                     </td>
                     <td>
                       <input
                         value={elm2Dollar}
-                        onChange={(e) => setElm2Dollar(clamp(e.target.value))}
-                        min="0"
-                        className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                        onChange={(e) => {
+                          const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                          setElm2Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                        }}
+                        min={0}
+                        max={100000}
+                        className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                         type="number"
+                        tabIndex={16}
                       />
                     </td>
-                  </tr>
+                  </>
                 )}
-                {showExtraChange === true && (
-                  <tr>
+                </tr>
+                <tr>
+                  <td>
+                    <label>
+                      <img
+                        src={BillTwenty}
+                        //alt="20's"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="20 Dollar Bill"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elm20DollarExpected}
+                      //onChange={e => setElm20DollarExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elm20Dollar}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm20Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={3}
+                    />
+                  </td>
+                  <td>
+                    <label>
+                      <img
+                        src={RollNickel}
+                        //alt="Nickel Rolls"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Nickel Roll"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmNicklesRolledExpected}
+                      //onChange={e => setElmNicklesRolledExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmNicklesRolled}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmNicklesRolled(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={9}
+                    />
+                  </td>
+                  {showExtraChange === true && (
+                  <>
                     <td>
                       <label>
                         <img
                           src={CoinHalf}
-                          alt="Half Dollar Coins"
+                          //alt="Half Dollar Coins"
                           className="inline-block align-middle w-12 h-12"
                           alt="Half Dollar Coin"
                         />
@@ -1312,24 +1158,316 @@ const CloseDayPage = () => {
                         value={elmHalfDollarCoinExpected}
                         //onChange={e => setElmHalfDollarCoinExpected(clamp(e.target.value))}
                         min="0"
-                        className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
-                        type="number"
+                        className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                        type="text"
                         disabled={true}
                       />
                     </td>
                     <td>
                       <input
                         value={elmHalfDollarCoin}
-                        onChange={(e) =>
-                          setElmHalfDollarCoin(clamp(e.target.value))
-                        }
-                        min="0"
-                        className="box-border text-center rounded-md my-2 ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                        onChange={(e) => {
+                          const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                          setElmHalfDollarCoin(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                        }}
+                        min={0}
+                        max={100000}
+                        className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
                         type="number"
+                        tabIndex={17}
                       />
                     </td>
-                  </tr>
+                  </>
                 )}
+                </tr>
+                <tr>
+                  <td>
+                    <label>
+                      <img
+                        src={BillTen}
+                        //alt="10's"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="10 Dollar Bill"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elm10DollarExpected}
+                      //onChange={e => setElm10DollarExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elm10Dollar}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm10Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={4}
+                    />
+                  </td>
+                  <td>
+                    <label>
+                      <img
+                        src={RollPenny}
+                        //alt="Penny Rolls"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Penny Roll"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmPenniesRolledExpected}
+                      //onChange={e => setElmPenniesRolledExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmPenniesRolled}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmPenniesRolled(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={10}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <label>
+                      <img
+                        src={BillFive}
+                        //alt="5's"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="5 Dollar Bill"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elm5DollarExpected}
+                      //onChange={e => setElm5DollarExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elm5Dollar}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm5Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={5}
+                    />
+                  </td>
+                  <td>
+                    <label>
+                      <img
+                        src={CoinQuarter}
+                        //alt="Quarters"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Quarter Coin"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmQuartersExpected}
+                      //onChange={e => setElmQuartersExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmQuarters}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmQuarters(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={11}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <label>
+                      <img
+                        src={BillOne}
+                        //alt="1's"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="1 Dollar Bill"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elm1DollarExpected}
+                      //onChange={e => setElm1DollarExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elm1Dollar}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElm1Dollar(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={6}
+                    />
+                  </td>
+                  <td>
+                    <label>
+                      <img
+                        src={CoinDime}
+                        //alt="Dimes"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Dime Coin"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmDimesExpected}
+                      //onChange={e => setElmDimesExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmDimes}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmDimes(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={11}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <label>
+                      <img
+                        src={CoinPenny}
+                        //alt="Pennies"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Penny Coin"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmPenniesExpected}
+                      //onChange={e => setElmPenniesExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmPennies}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmPennies(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 =hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={12}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <label>
+                      <img
+                        src={CoinNickel}
+                        //alt="Nickels"
+                        className="inline-block align-middle w-12 h-12"
+                        alt="Nickel Coin"
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      value={elmNicklesExpected}
+                      //onChange={e => setElmNicklesExpected(clamp(e.target.value))}
+                      min="0"
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 bg-gray-300"
+                      type="text"
+                      disabled={true}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={elmNickles}
+                      onChange={(e) => {
+                        const newValue = e.target.value.replace(/^0+/, ''); // Remove leading zeros
+                        setElmNickles(newValue === '' ? '0' : newValue); // If newValue is empty, set it to '0'
+                      }}
+                      min={0}
+                      max={100000}
+                      className="box-border text-center my-2 rounded-md ml-6 mr-12 w-24 float-right border-border-color border-2 =hover:bg-nav-bg bg-white"
+                      type="number"
+                      tabIndex={13}
+                    />
+                  </td>
+                </tr>
               </tbody>
             </table>
             <div className="mb-4">
